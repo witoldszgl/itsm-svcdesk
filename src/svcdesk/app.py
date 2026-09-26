@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from . import dora
 from .sla import UTC, due_instants, in_business_hours, priority_for, uses_business_clock
 from .store import Store
 
@@ -256,6 +257,19 @@ def transition(request: Request, ticket_id: str, action: str):
 
     store.put(ticket)
     return ticket
+
+
+@app.post("/dora/metrics")
+async def dora_metrics(request: Request):
+    """Lab 2, METRIC-SPEC.md section 6: a pure function of the request body."""
+    try:
+        body = json.loads(await request.body() or b"null")
+    except (ValueError, UnicodeDecodeError):
+        return error(422, "validation", "request body must be valid JSON")
+    try:
+        return dora.compute(body)
+    except dora.InvalidLog as exc:
+        return error(422, "invalid_log", str(exc))
 
 
 @app.post("/tickets/{ticket_id}/{action}")
