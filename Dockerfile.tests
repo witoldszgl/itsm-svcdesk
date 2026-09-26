@@ -1,0 +1,13 @@
+# Own test suite (Stretch S3): dependencies installed at build time, reaches only SVCDESK_URL.
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    SVCDESK_URL=http://svcdesk:8080
+
+WORKDIR /tests
+COPY tests/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+COPY tests/ ./
+
+CMD ["python", "run_tests.py"]
