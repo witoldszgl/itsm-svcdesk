@@ -9,5 +9,7 @@ WORKDIR /tests
 COPY tests/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY tests/ ./
+COPY fixtures/ /fixtures/
+ENV FIXTURES_DIR=/fixtures
 
 CMD ["python", "run_tests.py"]

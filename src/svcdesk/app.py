@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from . import dora
 from .sla import UTC, due_instants, in_business_hours, priority_for, uses_business_clock
 from .store import Store
+from .ticket_events import ticket_events
 
 REOPEN_WINDOW = timedelta(days=7)
 RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$")
@@ -257,6 +258,12 @@ def transition(request: Request, ticket_id: str, action: str):
 
     store.put(ticket)
     return ticket
+
+
+@app.get("/dora/ticket-events")
+async def dora_ticket_events(request: Request):
+    """Lab 2, METRIC-SPEC.md section 7."""
+    return ticket_events(request.app.state.store.all())
 
 
 @app.post("/dora/metrics")
