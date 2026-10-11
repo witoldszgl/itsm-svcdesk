@@ -49,6 +49,15 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
 
+  # Lab 3 Stretch 2 (M-30): Toxiproxy in front of svcdesk; API on 8474, the proxy listens on 8666.
+  #   docker compose --profile gap up -d toxiproxy
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.12.0
+    profiles: ["gap"]
+    ports:
+      - "8474:8474"
+      - "8666:8666"
+
   tests:
     profiles: ["tests"]
     build:
