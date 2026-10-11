@@ -1,0 +1,69 @@
+# ai-generated: 80% - Claude Code wrote the tests; the first firing evaluations were found with promtool itself
+# prometheus/alerts_test.yml - promtool unit tests of alerts.yml (MONITORING-SPEC.md M-20, M-21).
+#   docker run --rm -v "${PWD}/prometheus:/p" -w /p --entrypoint promtool prom/prometheus:v3.15.0 test rules alerts_test.yml
+# Every declared alert gets both edges: NOT firing one evaluation before its first firing evaluation (kills
+# `for - 5m` and `threshold / 1.5`), and firing at it (kills `for + 5m` and `threshold x 1.5`; the burn is below
+# 1.5 x the threshold, so the x 1.5 mutant never fires at all). The /tickets/{id} noise checks the route filter.
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # KbSearchErrorsBurnFast: 10 requests/s (600 a minute), healthy for 70 minutes, then 20 % fail (above the 14.4 % threshold, below 1.5 x 14.4 %).
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{job="svcdesk", instance="svcdesk:8080", http_request_method="GET", http_route="/kb/search", http_response_status_code="200"}'
+        values: '0+600x70 42480+480x60'
+      - series: 'http_server_request_duration_seconds_count{job="svcdesk", instance="svcdesk:8080", http_request_method="GET", http_route="/kb/search", http_response_status_code="502"}'
+        values: '0x70 120+120x60'
+      - series: 'http_server_request_duration_seconds_count{job="svcdesk", instance="svcdesk:8080", http_request_method="GET", http_route="/tickets/{id}", http_response_status_code="200"}'
+        values: '0+600x130'
+    alert_rule_test:
+      - eval_time: 113m
+        alertname: KbSearchErrorsBurnFast
+        exp_alerts: []
+      - eval_time: 114m
+        alertname: KbSearchErrorsBurnFast
+        exp_alerts:
+          - exp_labels: {service: svcdesk, slo: availability, severity: P1}
+            exp_annotations:
+              summary: "/kb/search is failing at 14.4x the error budget rate (over 14.4 % of searches answer 5xx in the last hour and 5 minutes); check kb-index"
+  # KbSearchErrorsBurnSlow: 600 a minute, healthy for 370 minutes (more than the 6h window), then 8 % fail (above 6 %, below 1.5 x 6 %).
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{job="svcdesk", instance="svcdesk:8080", http_request_method="GET", http_route="/kb/search", http_response_status_code="200"}'
+        values: '0+600x370 222552+552x400'
+      - series: 'http_server_request_duration_seconds_count{job="svcdesk", instance="svcdesk:8080", http_request_method="GET", http_route="/kb/search", http_response_status_code="502"}'
+        values: '0x370 48+48x400'
+      - series: 'http_server_request_duration_seconds_count{job="svcdesk", instance="svcdesk:8080", http_request_method="GET", http_route="/tickets/{id}", http_response_status_code="200"}'
+        values: '0+600x770'
+    alert_rule_test:
+      - eval_time: 639m
+        alertname: KbSearchErrorsBurnSlow
+        exp_alerts: []
+      - eval_time: 640m
+        alertname: KbSearchErrorsBurnSlow
+        exp_alerts:
+          - exp_labels: {service: svcdesk, slo: availability, severity: P2}
+            exp_annotations:
+              summary: "/kb/search is failing at 6x the error budget rate (over 6 % of searches answer 5xx in the last 6 hours and 30 minutes)"
+  # KbSearchLatencyBurnFast: 600 a minute, all 200; healthy (every request at or below 0.2 s) for 70 minutes, then 20 % above 0.2 s.
+  - interval: 1m
+    input_series:
+      - series: 'http_server_request_duration_seconds_count{job="svcdesk", instance="svcdesk:8080", http_request_method="GET", http_route="/kb/search", http_response_status_code="200"}'
+        values: '0+600x130'
+      - series: 'http_server_request_duration_seconds_bucket{job="svcdesk", instance="svcdesk:8080", http_request_method="GET", http_route="/kb/search", http_response_status_code="200", le="0.2"}'
+        values: '0+600x70 42480+480x60'
+      - series: 'http_server_request_duration_seconds_count{job="svcdesk", instance="svcdesk:8080", http_request_method="GET", http_route="/tickets/{id}", http_response_status_code="200"}'
+        values: '0+600x130'
+    alert_rule_test:
+      - eval_time: 112m
+        alertname: KbSearchLatencyBurnFast
+        exp_alerts: []
+      - eval_time: 113m
+        alertname: KbSearchLatencyBurnFast
+        exp_alerts:
+          - exp_labels: {service: svcdesk, slo: latency, severity: P2}
+            exp_annotations:
+              summary: "/kb/search is slow at 14.4x the latency budget rate (over 14.4 % of searches above 0.2 s in the last hour and 5 minutes)"

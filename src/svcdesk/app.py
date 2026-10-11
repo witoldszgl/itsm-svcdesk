@@ -11,7 +11,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import dora
+from . import dora, kb
+from .metrics import metrics_middleware, metrics_response
 from .sla import UTC, due_instants, in_business_hours, priority_for, uses_business_clock
 from .store import Store
 from .ticket_events import ticket_events
@@ -24,7 +25,9 @@ TIMESTAMPS = ("created_at", "acknowledged_at", "resolved_at", "closed_at")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.store = Store(os.environ.get("SVCDESK_DB", "/data/svcdesk.db"))
+    app.state.kb_client = kb.new_client()
     yield
+    await app.state.kb_client.aclose()
 
 
 app = FastAPI(title="svcdesk", lifespan=lifespan)
@@ -76,6 +79,10 @@ async def clock_middleware(request: Request, call_next):
             return error(422, "invalid_clock", "X-Test-Clock must be an RFC 3339 instant with an offset")
     request.state.now = now
     return await call_next(request)
+
+
+# Lab 3, M-04: registered last, so it is the outermost middleware and sees every answer once.
+app.middleware("http")(metrics_middleware)
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -156,6 +163,25 @@ def validate(body) -> dict:
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "svcdesk"}
+
+
+@app.get("/metrics")
+async def metrics():
+    """Lab 3, M-03."""
+    return metrics_response()
+
+
+@app.get("/kb/search")
+async def kb_search(request: Request):
+    """Lab 3, M-02: exactly one call to kb-index, no cache, no retry."""
+    q = request.query_params.get("q")
+    if not kb.valid_query(q):
+        return error(400, "validation", "q must be a string of 1 to 200 characters")
+    try:
+        hits = await kb.search(request.app.state.kb_client, q)
+    except kb.UpstreamUnavailable as exc:
+        return error(502, "upstream_unavailable", str(exc))
+    return {"query": q, "hits": hits}
 
 
 @app.post("/tickets")

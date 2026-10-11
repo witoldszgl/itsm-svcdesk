@@ -1,0 +1,69 @@
+# ai-generated: 85% - Claude Code wrote the rules from slo.md and MONITORING-SPEC.md M-17 to M-19, reviewed by the student
+# prometheus/alerts.yml - multiwindow, multi-burn-rate alerts for the SLO of GET /kb/search (slo.md).
+# Objectives: availability 0.99, latency 0.99 (threshold 0.2 s), window 28d. Every threshold is the declared burn
+# rate times (1 - objective), written as a constant in the alert itself (M-18).
+groups:
+  - name: svcdesk-slo
+    rules:
+      # Availability, fast burn: 14.4x over 1h and 5m. 1h at 14.4x spends 14.4 / 672 = 2.1 % of the 28-day budget.
+      - alert: KbSearchErrorsBurnFast
+        expr: |
+          (
+            sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search", http_response_status_code=~"5.."}[1h]))
+              /
+            sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search"}[1h]))
+          ) > 14.4 * (1 - 0.99)
+          and
+          (
+            sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search", http_response_status_code=~"5.."}[5m]))
+              /
+            sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search"}[5m]))
+          ) > 14.4 * (1 - 0.99)
+        labels:
+          service: svcdesk
+          slo: availability
+          severity: P1
+        annotations:
+          summary: "/kb/search is failing at 14.4x the error budget rate (over 14.4 % of searches answer 5xx in the last hour and 5 minutes); check kb-index"
+
+      # Availability, slow burn: 6x over 6h and 30m. 6h at 6x spends 36 / 672 = 5.4 % of the budget.
+      - alert: KbSearchErrorsBurnSlow
+        expr: |
+          (
+            sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search", http_response_status_code=~"5.."}[6h]))
+              /
+            sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search"}[6h]))
+          ) > 6 * (1 - 0.99)
+          and
+          (
+            sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search", http_response_status_code=~"5.."}[30m]))
+              /
+            sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search"}[30m]))
+          ) > 6 * (1 - 0.99)
+        labels:
+          service: svcdesk
+          slo: availability
+          severity: P2
+        annotations:
+          summary: "/kb/search is failing at 6x the error budget rate (over 6 % of searches answer 5xx in the last 6 hours and 30 minutes)"
+
+      # Latency, fast burn: 14.4x over 1h and 5m: over 14.4 % of searches slower than 0.2 s.
+      - alert: KbSearchLatencyBurnFast
+        expr: |
+          (
+            1 - sum(rate(http_server_request_duration_seconds_bucket{job="svcdesk", http_route="/kb/search", le="0.2"}[1h]))
+              /
+            sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search"}[1h]))
+          ) > 14.4 * (1 - 0.99)
+          and
+          (
+            1 - sum(rate(http_server_request_duration_seconds_bucket{job="svcdesk", http_route="/kb/search", le="0.2"}[5m]))
+              /
+            sum(rate(http_server_request_duration_seconds_count{job="svcdesk", http_route="/kb/search"}[5m]))
+          ) > 14.4 * (1 - 0.99)
+        labels:
+          service: svcdesk
+          slo: latency
+          severity: P2
+        annotations:
+          summary: "/kb/search is slow at 14.4x the latency budget rate (over 14.4 % of searches above 0.2 s in the last hour and 5 minutes)"

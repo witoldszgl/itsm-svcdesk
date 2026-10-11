@@ -3,13 +3,13 @@ lab3_first_draft:
   source: ai
   tool: "Claude Opus 5.5 (claude-opus-5-5) in Claude Code CLI, 11 October 2026"
   ladder: [0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.3, 0.5, 0.75, 1, 2, 5]
-  verdict: TODO
-  evidence: {p99_seconds: TODO, bucket: [TODO, TODO], relative_width: TODO}
+  verdict: refuted
+  evidence: {p99_seconds: 0.1097, bucket: [0.1, 0.15], relative_width: 0.456}
 lab3_flawed_ladder:
   verdict: refuted
-  evidence: {p99_seconds: TODO, bucket: [TODO, TODO], relative_width: TODO}
+  evidence: {p99_seconds: 0.1097, bucket: [0.04, 0.5], relative_width: 4.193}
 ---
-<!-- ai-generated: TODO -->
+<!-- ai-generated: 70% - the Prompt and Answer are the assistant exchange verbatim; the verdicts were drafted by Claude Code from my load 3 run and checked by me -->
 
 # The assistant's first draft, and two verdicts
 
@@ -63,12 +63,42 @@ If you define an SLO later, replace the fixed 5 % with burn-rate alerts (for exa
 
 ## Verdict on the draft ladder
 
-TODO
+The measurement: `itsmlab load 3` for my login `witoldszgl` (60 s open-loop at 40 requests/s, latency-corrected)
+gave p50 16.4 ms, p95 33.1 ms and **p99 = 0.1097 s** (q_kb 0.1057 s). The draft ladder puts it in the bucket
+**(0.1, 0.15]**: 0.05 s wide, which is 0.05 / 0.1097 = **45.6 %** of the p99, more than twice the 20 % that M-11
+allows. The result does not depend on the few per cent the grader's q will differ by: 0.95q = 0.104 s and
+1.05q = 0.115 s fall into the same bucket, with the same width of about 46 %.
+
+What `histogram_quantile(0.99, ...)` could report from that bucket: it assumes the requests are spread evenly
+between 0.1 and 0.15 s and interpolates, so the dashboard's p99 could be anything from just above 100 ms to 150 ms,
+depending only on how many requests land below 0.1 s. My real slow mode sits between about 85 and 140 ms and is
+not uniform inside that bucket, so a p99 of "130 ms" or "105 ms" would look equally believable and nothing would
+warn me. The assistant's guess that the p99 of an index-backed search lives "at 0.15, 0.2, 0.3" was in the right
+area, but its steps there (50 to 100 ms) are far too coarse for a p99 near 110 ms.
+
+Verdict: **refuted** - the draft ladder does not resolve my p99 (45.6 % > 20 %).
 
 ## The draft alert rule
 
-TODO
+The assistant proposed one single-window rule: the 5xx share of `/kb/search` over 5 minutes above 5 %, `for: 5m`,
+`severity: page`. For my SLO (availability 99 %, 28 days) a 5 % error share is a burn rate of 5: it would page a
+person at night for a burn that spends the budget in about 5.6 days - a chat-level problem - and with only a 5-minute
+window it would also page on a short blip of a few bad minutes that hardly touches the budget, and it has no `job`
+filter and no `service`/`slo` labels, and `page` is not one of the P1/P2/P3 severities Lab 4 routes on.
+
+What I kept: the shape of the expression - 5xx count rate on `http_route="/kb/search"` divided by the count rate of
+all its requests, with `sum` so it is one series - and the advice from the end of the answer: burn rates 14.4 over
+1h and 6 over 6h, each combined with a short window. In `prometheus/alerts.yml` these became
+`KbSearchErrorsBurnFast` (14.4x, 1h and 5m, P1 page) and `KbSearchErrorsBurnSlow` (6x, 6h and 30m, P2 chat), with
+thresholds written as `14.4 * (1 - 0.99)` and `6 * (1 - 0.99)`, plus a latency alert the draft did not have.
 
 ## Verdict on the instructor's flawed ladder
 
-TODO
+The flawed ladder spends twelve of its fourteen boundaries below 40 ms (0.001 to 0.04), where my median (16 ms) and
+my p95 (33 ms) live, and then jumps straight to 0.5 and 2.5. My p99 of 0.1097 s falls into **(0.04, 0.5]**:
+0.46 s wide, 0.46 / 0.1097 = **419.3 %** of the p99. `histogram_quantile` could report anything from 40 ms to
+500 ms for it - in practice, with 1 % of requests above the p99 spread over a bucket ten times wider than the slow
+mode, a number of a few hundred milliseconds that has nothing to do with the real 110 ms. The whole slow mode of my
+`kb-index` (about 85 to 140 ms), which is exactly what the p99 is about, is invisible inside one bucket.
+
+Verdict: **refuted** - 419.3 % is twenty times what M-11 allows.
