@@ -1,0 +1,50 @@
+{
+  "investigator": {
+    "agent": "Claude Code (general-purpose subagent, curl to the Prometheus HTTP API)",
+    "model": "claude-opus-5-5",
+    "mcp_server": "none: the Prometheus HTTP API on the served recording (port 19090), read-only",
+    "transcript": "ai-rca/second/transcript.md"
+  },
+  "hypotheses": [
+    {
+      "id": "S1",
+      "hypothesis": "Most likely root cause: the payment service is failing its Charge calls (errors signal; up to about 31% of oteldemo.PaymentService/Charge failing from about 06:39 to 06:46), with the error starting in payment's internal `charge` span, as shown by Query 3, Query 4 and Query 8.",
+      "component": "payment",
+      "predicts": "sum(rate(traces_span_metrics_calls_total{service_name=\"payment\", span_kind=\"SPAN_KIND_SERVER\", span_name=\"oteldemo.PaymentService/Charge\", status_code=\"STATUS_CODE_ERROR\"}[5m])) / sum(rate(traces_span_metrics_calls_total{service_name=\"payment\", span_kind=\"SPAN_KIND_SERVER\", span_name=\"oteldemo.PaymentService/Charge\"}[5m])) > 0.1",
+      "at": "2026-10-12T06:42:00Z",
+      "result": true,
+      "verdict": "correct",
+      "evidence": "At 06:42:00Z 31 % of the Charge calls payment served failed (0.032/s of 0.10/s); on the baseline payment has no error series, so the ratio is empty. It found this on its own: it never read ALERTS, and the page named only checkout."
+    },
+    {
+      "id": "S2",
+      "hypothesis": "The checkout service's PlaceOrder errors, and the frontend /api/checkout errors that paged, are purely downstream propagation of the payment Charge failures (errors signal; identical rates of 0.0321/s at 06:42 and no other failing checkout dependency), as shown by Query 3 and Query 10.",
+      "component": "checkout",
+      "predicts": "sum(rate(traces_span_metrics_calls_total{service_name=\"checkout\", span_kind=\"SPAN_KIND_SERVER\", span_name=\"oteldemo.CheckoutService/PlaceOrder\", status_code=\"STATUS_CODE_ERROR\"}[5m])) > 0.01 and on() sum(rate(traces_span_metrics_calls_total{service_name=\"payment\", span_kind=\"SPAN_KIND_SERVER\", span_name=\"oteldemo.PaymentService/Charge\", status_code=\"STATUS_CODE_ERROR\"}[5m])) > 0.01",
+      "at": "2026-10-12T06:42:00Z",
+      "result": true,
+      "verdict": "correct",
+      "evidence": "Both sides fail at the same 0.032/s at 06:42:00Z, as it said, and neither has errors on the baseline. The page was ShopCheckoutErrors on checkout's own server spans rather than a frontend alert, but the propagation it describes holds."
+    },
+    {
+      "id": "S3",
+      "hypothesis": "A concurrent traffic surge of homepage GET / requests hit frontend and frontend-proxy (traffic signal; about 4 to 63 req/s on frontend between 06:38 and 06:46), but I believe with moderate confidence that it is a separate, coincident event (possibly the `loadGeneratorFloodHomepage` flag) and not the cause of the checkout errors, because checkout and payment traffic stayed flat and frontend logged no errors outside checkout, as shown by Query 9, Query 12 and Query 13.",
+      "component": "frontend",
+      "predicts": "sum(rate(traces_span_metrics_calls_total{service_name=\"frontend\", span_kind=\"SPAN_KIND_SERVER\"}[5m])) > 20",
+      "at": "2026-10-12T06:42:00Z",
+      "result": true,
+      "verdict": "correct",
+      "evidence": "Frontend served 63 requests/s on the 5-minute window at 06:42:00Z against 3.8/s on the baseline, so the query is true at at and empty on the baseline. Its guess of the loadGeneratorFloodHomepage flag agrees with my postmortem; the claim scored is the traffic surge."
+    },
+    {
+      "id": "S4",
+      "hypothesis": "Probably, though not proven from metrics alone, the payment failures were injected by a feature flag (the OTel Demo `paymentFailure` float flag) served by flagd (errors and traffic signals; payment calls flagd ResolveFloat throughout the window, and flagd EventStream errors in ad, recommendation, payment and flagd at 06:36-38 and 06:44-46 bracket the error window, consistent with a flag change being pushed), as shown by Query 5 and Query 6.",
+      "component": null,
+      "predicts": null,
+      "at": null,
+      "result": null,
+      "verdict": "unfalsifiable",
+      "why_no_query": "The claim is about the mechanism, a feature flag served by flagd, and no metric in the snapshot names a flag or its state (INCIDENT-SPEC 2.3): flagd EventStream errors happen on reconnects whatever the flag values, so no PromQL query over this snapshot could prove the flag hypothesis wrong."
+    }
+  ]
+}
