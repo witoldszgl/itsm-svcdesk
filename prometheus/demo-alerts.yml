@@ -1,0 +1,62 @@
+# ai-generated: 85% - Claude Code wrote the rules from the course template and INCIDENT-SPEC.md 2.2, checked on the recording by the student
+# prometheus/demo-alerts.yml - symptom alerts on the shop (INCIDENT-SPEC.md I-01, I-02, I-05).
+# Span metrics arrive once a minute, so every window is 5 minutes; only SERVER spans count (the load generator's own
+# client calls fail on the healthy shop). All rules sit in one group, so that on equal starts the P1 wins.
+# The static label `system: shop` is what the inhibit rule of alertmanager.yml compares in `equal`.
+groups:
+  - name: shop-symptoms
+    rules:
+      # Page: more than 5 % of the orders checkout answered in the last 5 minutes failed. Healthy shop: 0 %.
+      - alert: ShopCheckoutErrors
+        expr: |
+          sum(rate(traces_span_metrics_calls_total{service_name="checkout", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR"}[5m]))
+          /
+          sum(rate(traces_span_metrics_calls_total{service_name="checkout", span_kind="SPAN_KIND_SERVER"}[5m]))
+          > 0.05
+        for: 1m
+        labels:
+          service: checkout
+          severity: P1
+          system: shop
+        annotations:
+          summary: "More than 5 % of checkout requests fail (5-minute window)"
+
+      # Page: the slowest 1 % of orders take more than 2 s. Healthy shop: p99 about 50 ms. Catches the draws whose only
+      # checkout symptom is latency (intlShippingSlowdown, productCatalogLockContention).
+      - alert: ShopCheckoutSlow
+        expr: |
+          histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{service_name="checkout", span_kind="SPAN_KIND_SERVER"}[5m])))
+          > 2000
+        for: 1m
+        labels:
+          service: checkout
+          severity: P1
+          system: shop
+        annotations:
+          summary: "Checkout p99 above 2 s (5-minute window)"
+
+      # Chat: the payment service fails charges. A cause of checkout errors, not a symptom of its own: P2.
+      - alert: ShopPaymentErrors
+        expr: |
+          sum(rate(traces_span_metrics_calls_total{service_name="payment", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR"}[5m]))
+          > 0.005
+        for: 1m
+        labels:
+          service: payment
+          severity: P2
+          system: shop
+        annotations:
+          summary: "The payment service answers errors to its callers"
+
+      # Chat: the shop's front door is slow. Healthy p99 about 5-50 ms.
+      - alert: ShopFrontendSlow
+        expr: |
+          histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{service_name="frontend", span_kind="SPAN_KIND_SERVER"}[5m])))
+          > 3000
+        for: 2m
+        labels:
+          service: frontend
+          severity: P3
+          system: shop
+        annotations:
+          summary: "Frontend p99 above 3 s (5-minute window)"
