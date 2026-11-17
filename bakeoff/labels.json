@@ -1,0 +1,75 @@
+{
+  "set": "lab5-canary",
+  "defects": [
+    {
+      "id": "A03",
+      "file": "lab5-canary/app/attachment_read.py",
+      "class": "path-traversal",
+      "cwe": "CWE-22",
+      "start_line": 9,
+      "end_line": 10
+    },
+    {
+      "id": "A09",
+      "file": "lab5-canary/app/rules_loader.py",
+      "class": "deserialization",
+      "cwe": "CWE-502",
+      "start_line": 7,
+      "end_line": 7
+    },
+    {
+      "id": "A11",
+      "file": "lab5-canary/app/sla_formula.py",
+      "class": "injection",
+      "cwe": "CWE-95",
+      "start_line": 6,
+      "end_line": 6
+    },
+    {
+      "id": "A16",
+      "file": "lab5-canary/app/webhook_relay.py",
+      "class": "ssrf",
+      "cwe": "CWE-918",
+      "start_line": 7,
+      "end_line": 7
+    },
+    {
+      "id": "C01",
+      "file": "lab5-canary/config/backup.sh",
+      "class": "secret",
+      "cwe": "CWE-798",
+      "start_line": 3,
+      "end_line": 3
+    },
+    {
+      "id": "C04",
+      "file": "lab5-canary/config/jwt_secret.py",
+      "class": "secret",
+      "cwe": "CWE-321",
+      "start_line": 2,
+      "end_line": 2
+    },
+    {
+      "id": "C05",
+      "file": "lab5-canary/config/mailer.py",
+      "class": "secret",
+      "cwe": "CWE-798",
+      "start_line": 4,
+      "end_line": 4
+    },
+    {
+      "id": "D01",
+      "file": "lab5-canary/requirements.txt",
+      "class": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "package": "cryptography"
+    },
+    {
+      "id": "D03",
+      "file": "lab5-canary/requirements.txt",
+      "class": "vulnerable-dependency",
+      "cwe": "CWE-1395",
+      "package": "Jinja2"
+    }
+  ]
+}

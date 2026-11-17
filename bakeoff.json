@@ -1,0 +1,46 @@
+{
+  "set": "lab5-canary",
+  "defects": 9,
+  "tools": {
+    "gitleaks": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 8,
+      "precision": 1.0,
+      "recall": 0.1111,
+      "f1": 0.2
+    },
+    "grype": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 7,
+      "precision": 1.0,
+      "recall": 0.2222,
+      "f1": 0.3636
+    },
+    "osv-scanner": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 7,
+      "precision": 1.0,
+      "recall": 0.2222,
+      "f1": 0.3636
+    },
+    "semgrep": {
+      "tp": 2,
+      "fp": 3,
+      "fn": 7,
+      "precision": 0.4,
+      "recall": 0.2222,
+      "f1": 0.2857
+    },
+    "trivy": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 7,
+      "precision": 1.0,
+      "recall": 0.2222,
+      "f1": 0.3636
+    }
+  }
+}
