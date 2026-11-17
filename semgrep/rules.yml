@@ -1,0 +1,34 @@
+# ai-generated: 80% - Claude Code (Opus 5.5) drafted both rules from svcdesk's code; tests and scope checked with semgrep --test
+rules:
+  # svcdesk decision: configuration is read when the service starts (lifespan, request time), never at import time,
+  # so tests and the compose file can change it without re-importing modules. A module-level read freezes it.
+  - id: svcdesk-env-read-at-import
+    languages: [python]
+    severity: WARNING
+    message: >-
+      Environment variable read at module import time; svcdesk reads configuration at startup or per request so it
+      can be changed without re-importing the module
+    patterns:
+      - pattern-either:
+          - pattern: os.environ.get(...)
+          - pattern: os.environ.setdefault(...)
+          - pattern: os.environ[...]
+          - pattern: os.getenv(...)
+      - pattern-not-inside: |
+          def $F(...):
+              ...
+      - pattern-not-inside: |
+          async def $F(...):
+              ...
+
+  # svcdesk decision: error bodies are built by error(status, code, message); a message that interpolates a value
+  # echoes request input (a ticket id, an action from the URL) back to the caller. JSON keeps it from being XSS, but
+  # every such message is a place where caller-controlled text reaches a response and must stay JSON-encoded.
+  - id: svcdesk-error-echoes-input
+    languages: [python]
+    severity: INFO
+    message: >-
+      error() message interpolates a value into the response body; make sure it is request-controlled text that is
+      only ever JSON-encoded, never rendered as HTML or logged unescaped
+    patterns:
+      - pattern: error($STATUS, $CODE, f"...{$X}...")
