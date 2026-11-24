@@ -526,7 +526,20 @@ rollback() {
   log "ROLLBACK: $reason"
   route 100 0 0 || route 100 0 0 || die "could not roll back the weights"
   record_action closed-loop "set weights $( (( N_UP >= 3 )) && echo 100/0/0 || echo 100/0 ) (roll back): $reason"
+  record_release_state
   finish rolled-back "$reason"
+}
+
+# record_release_state: ITSM-43 of my Lab 4 postmortem - "what changed?" is one query. Reads the release rules'
+# svcdesk:release_build (the build on each track) and svcdesk:release_builds_seen:10m (a track that changed build
+# fires SvcdeskReleaseChanged, P3) and puts the answer into the record. Read-only, and never a reason to fail.
+record_release_state() {
+  local body state seen
+  body=$(curl -sS --max-time 5 "${PROMETHEUS_URL%/}/api/v1/query" \
+    --data-urlencode 'query={__name__=~"svcdesk:release_build|svcdesk:release_builds_seen:10m"}' 2>/dev/null) || body=""
+  state=$(jq -r '[.data.result[]? | select(.metric.__name__ == "svcdesk:release_build") | "\(.metric.track)=\(.metric.version)"] | sort | join(", ")' <<<"$body" 2>/dev/null || true)
+  seen=$(jq -r '[.data.result[]? | select(.metric.__name__ == "svcdesk:release_builds_seen:10m") | "\(.metric.track): \(.value[1])"] | sort | join(", ")' <<<"$body" 2>/dev/null || true)
+  record_action read-only "read svcdesk:release_build (ITSM-43, what changed): ${state:-no data}; builds seen in 10 min per track: ${seen:-no data}"
 }
 
 log "gate: 5xx share > $(calc "100 * $AV_T") %, share slower than ${LATENCY_THRESHOLD_S} s (le=\"$LE\") > $(calc "100 * $LAT_T") %," \
@@ -578,4 +591,5 @@ done
 # 5. Promote: the candidate serves every request.
 route 0 100 0 || rollback "could not set the weights 0/100 to promote"
 record_action closed-loop "set weights 0/100$( (( N_UP >= 3 )) && echo /0 ) (promote)"
+record_release_state
 finish promoted "every phase passed: $(calc "int($N)") canary searches in all, $(calc "int($E)") 5xx ($(calc "int(1000 * $E / ($N > 0 ? $N : 1)) / 10") %), $(calc "int($N - $F)") slower than ${LATENCY_THRESHOLD_S} s, against thresholds of $(calc "100 * $AV_T") % and $(calc "100 * $LAT_T") %"

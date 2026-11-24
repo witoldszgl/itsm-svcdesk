@@ -66,6 +66,8 @@ services:
     configs:
       - source: prometheus
         target: /etc/prometheus/prometheus.yml
+      - source: release-rules
+        target: /etc/prometheus/release-rules.yml
 
 configs:
   # Caddy's configuration at start; deploy.sh reloads this same text with other weights (POST /load). Keep
@@ -87,6 +89,7 @@ configs:
       global:
         scrape_interval: 2s
         evaluation_interval: 2s
+      rule_files: [/etc/prometheus/release-rules.yml]
       scrape_configs:
         - job_name: svcdesk
           static_configs:
@@ -94,6 +97,24 @@ configs:
               labels: {track: stable}
             - targets: ["svcdesk-canary:8080"]
               labels: {track: canary}
+  # Lab 4 postmortem, ITSM-43 (Stretch 4): "what changed?" must be one query, not a guess from symptoms. In Lab 4
+  # three flags changed and nothing showed it; here a release changes which build answers, so the build on each track
+  # is a series of its own (svcdesk:release_build), and a track whose build changed in the last 10 minutes fires a P3
+  # to chat (SvcdeskReleaseChanged) - the same for a release made by deploy.sh as for one made by hand.
+  release-rules:
+    content: |
+      groups:
+        - name: svcdesk-release
+          rules:
+            - record: svcdesk:release_build
+              expr: max by (track, version) (svcdesk_build_info{job="svcdesk"})
+            - record: svcdesk:release_builds_seen:10m
+              expr: count by (track) (max by (track, version) (max_over_time(svcdesk_build_info{job="svcdesk"}[10m])))
+            - alert: SvcdeskReleaseChanged
+              expr: svcdesk:release_builds_seen:10m > 1
+              labels: {severity: P3, system: svcdesk}
+              annotations:
+                summary: "the {{ $$labels.track }} track of svcdesk served more than one build in the last 10 minutes"
   # The course's Stretch 1 recipe, unchanged: $$ for nginx variables, a resolver so the recreated canary is found,
   # keepalive_timeout 0 so a slow mirror never delays the next user's request, short mirror timeouts.
   nginx:
