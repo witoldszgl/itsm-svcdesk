@@ -1,0 +1,123 @@
+# ai-generated: 60% - the course's template and its Stretch 1 nginx recipe, merged by Claude Code; I set my login, my Lab 3 ladder and the 2 s scrape
+# The Lab 6 release stack (RELEASE-SPEC.md R-01 to R-06), with Stretch 1's shadow (R-29) merged in.
+#
+#   docker compose -f release/compose.yml up -d --wait      # edge (Caddy) on localhost:8080, Prometheus on :9090
+#   ./itsmlab.sh traffic 6                                  # the course's traffic through edge, a table every 5 s
+#   docker compose -f release/compose.yml down -v           # stop it; -v also drops Prometheus's data
+#
+# Other host ports: RELEASE_PORT=18080 PROMETHEUS_PORT=19090 docker compose -f release/compose.yml up -d --wait
+#
+# Caddy has three upstreams, weights in the order stable, canary, shadow:
+#   100 0 0   2.0.0 serves everything (the start, and a rollback)
+#   0 0 100   users get 2.0.0 through nginx, which mirrors a copy of every search to the canary (the shadow phase)
+#   90 10 0   a weighted canary step                    0 100 0   promoted
+# Weights change only through Caddy's admin API on edge:2019 (R-14); deploy.sh does it.
+#
+# R-01: no bind mounts (configuration is inline, under configs:), every published port from a variable with a
+# default. R-03: the two svcdesk services differ in `image` only - both come from x-svcdesk. Never SVCDESK_V2_SEED.
+name: svcdesk-release
+
+x-svcdesk: &svcdesk
+  environment:
+    KB_INDEX_URL: http://kb-index:8080
+    # My Lab 3 ladder (src/svcdesk/metrics.py, 29 boundaries): fine between 0.075 and 0.2 s around my profile's
+    # slow mode, and 0.2 - the latency threshold of my slo.md - as an exact boundary (R-05).
+    SVCDESK_BUCKETS: "0.005,0.01,0.015,0.02,0.025,0.03,0.04,0.05,0.06,0.075,0.09,0.095,0.1,0.105,0.11,0.115,0.12,0.125,0.13,0.14,0.15,0.175,0.2,0.25,0.3,0.5,1,2,5"
+  depends_on:
+    kb-index:
+      condition: service_started
+  restart: unless-stopped
+
+services:
+  edge:
+    image: caddy:2.11.4
+    ports:
+      - "${RELEASE_PORT:-8080}:8080"
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    depends_on: [svcdesk-stable, svcdesk-canary, shadow]
+
+  svcdesk-stable:
+    <<: *svcdesk
+    image: ghcr.io/swasik/svcdesk-v2-seeded:2.0.0
+
+  svcdesk-canary:
+    <<: *svcdesk
+    image: ${CANARY_IMAGE:-ghcr.io/swasik/svcdesk-v2-seeded:2.0.0}
+
+  # Stretch 1 (R-29): the mirror. Proxies every request to svcdesk-stable and a copy to svcdesk-canary, whose
+  # answer it throws away. It gets traffic only while Caddy's third weight is above 0.
+  shadow:
+    image: nginx:1.30.5-alpine
+    configs:
+      - source: nginx
+        target: /etc/nginx/nginx.conf
+
+  kb-index:                                          # Lab 3's dependency; no healthcheck: the image has no shell
+    image: ghcr.io/swasik/seeded-toxic:2026
+    environment:
+      SEEDED_TOXIC_LOGIN: witoldszgl
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    configs:
+      - source: prometheus
+        target: /etc/prometheus/prometheus.yml
+
+configs:
+  # Caddy's configuration at start; deploy.sh reloads this same text with other weights (POST /load). Keep
+  # `admin 0.0.0.0:2019`. Never all weights at 0 (R-06). A `$` in this block is written `$$`.
+  caddyfile:
+    content: |
+      {
+      	admin 0.0.0.0:2019
+      }
+      :8080 {
+      	reverse_proxy svcdesk-stable:8080 svcdesk-canary:8080 shadow:8080 {
+      		lb_policy weighted_round_robin 100 0 0
+      	}
+      }
+  # Two tracks, one job (R-05). Scraped every 2 s: the gate reads raw counters, and a faster scrape shortens the
+  # reaction delay D of the blast radius by up to 3 s.
+  prometheus:
+    content: |
+      global:
+        scrape_interval: 2s
+        evaluation_interval: 2s
+      scrape_configs:
+        - job_name: svcdesk
+          static_configs:
+            - targets: ["svcdesk-stable:8080"]
+              labels: {track: stable}
+            - targets: ["svcdesk-canary:8080"]
+              labels: {track: canary}
+  # The course's Stretch 1 recipe, unchanged: $$ for nginx variables, a resolver so the recreated canary is found,
+  # keepalive_timeout 0 so a slow mirror never delays the next user's request, short mirror timeouts.
+  nginx:
+    content: |
+      events {}
+      http {
+        access_log off;
+        resolver 127.0.0.11 valid=5s ipv6=off;
+        server {
+          listen 8080;
+          keepalive_timeout 0;
+          location / {
+            mirror /mirror;
+            mirror_request_body off;
+            set $$stable svcdesk-stable:8080;
+            proxy_pass http://$$stable;
+          }
+          location = /mirror {
+            internal;
+            set $$canary svcdesk-canary:8080;
+            proxy_pass http://$$canary$$request_uri;
+            proxy_connect_timeout 200ms;
+            proxy_send_timeout 200ms;
+            proxy_read_timeout 300ms;
+          }
+        }
+      }

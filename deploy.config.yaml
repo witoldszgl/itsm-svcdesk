@@ -1,0 +1,25 @@
+# ai-generated: 50% - the course's example shape; Claude Code proposed the plan, I chose the burn rates from my Lab 3 profile
+# deploy.config.yaml - the plan and the thresholds of the release (RELEASE-SPEC.md R-07 to R-11).
+# Baseline: my own Lab 3 slo.md (baselines: {lab3: student}): availability 0.99, latency 0.99 within 0.2 s, 28 days.
+lab6_deploy:
+  slo:                                 # R-08, R-09: equal to my Lab 3 slo.md
+    window: 28d
+    availability: {objective: 0.99}
+    latency: {objective: 0.99, threshold_seconds: 0.2}
+  gate:                                # R-09: max_burn_rate >= 1, and max_burn_rate x (1 - objective) <= 0.20
+    availability: {max_burn_rate: 10}  # a step fails when the canary's 5xx share exceeds 10 x (1 - 0.99) = 10 %
+    latency: {max_burn_rate: 10}       # ... or its share slower than 0.2 s exceeds 10 x (1 - 0.99) = 10 %
+    min_requests: 60                   # canary searches a step must have seen before it may pass
+    interval: 2s                       # how often the gate reads Prometheus (the scrape is 2 s)
+    min_failures: 5                    # a share above a threshold fails a step only with at least this many bad searches
+    stall_after: 10s                   # no new canary search observed for this long while traffic flows = a hang
+  steps:                               # canary weights in per cent, after the shadow has passed
+    - {weight: 10, min_duration: 20s}
+    - {weight: 50, min_duration: 15s}
+  timeout: 165s                        # the script's own deadline (the runner kills it at 180 s)
+  shadow:                              # Stretch 1 (R-29): mirrored searches before any user reaches the candidate
+    tool: nginx
+    min_requests: 200                  # more than the 120 searches a hang may answer before it stops
+    min_duration: 10s
+    max_duration: 60s
+  flag: null                           # Stretch 2 not taken
