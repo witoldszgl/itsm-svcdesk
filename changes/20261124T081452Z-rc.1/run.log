@@ -1,0 +1,29 @@
+08:14:52 candidate itsmlab.local/lab6-candidate:26e30c30b861, stable ghcr.io/swasik/svcdesk-v2-seeded:2.0.0, strategy canary
+08:14:52 config: SLO window 28d; availability 0.99 (max burn 10); latency 0.99 under 0.2s (max burn 10); min_requests 60; interval 2s; timeout 165s; steps 10 50 % for 20 15 s
+08:14:52 Prometheus http://prometheus:9090; Caddy admin http://edge:2019
+08:14:52 gate: 5xx share > 10 %, share slower than 0.2 s (le="0.2") > 10 %, each with >= 5 bad; stall after 10 s; shadow nginx (200 searches, 10-60 s)
+08:14:52 weights now 100 0 0
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Recreate 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Recreated 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Starting 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Started 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Waiting 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Healthy 
+08:14:54 svcdesk-canary runs itsmlab.local/lab6-candidate:26e30c30b861
+08:14:54 action [approve-then-act] start svcdesk-canary with the candidate at weight 0
+08:14:59 action [read-only] read svcdesk_build_info from Prometheus: canary track runs 2.1.0-rc.1, stable 2.0.0
+08:14:59 weights now 0 0 100
+08:14:59 action [closed-loop] set weights 0/0/100: every user search through the nginx mirror to 2.0.0, a copy to the candidate
+08:15:01 shadow: 2 s, canary searches 2 in the phase (2 in all), 5xx 0, slower than 0.2s 0
+08:15:03 shadow: 4 s, canary searches 40 in the phase (40 in all), 5xx 1, slower than 0.2s 0
+08:15:05 shadow: 6 s, canary searches 40 in the phase (40 in all), 5xx 1, slower than 0.2s 0
+08:15:08 shadow: 8 s, canary searches 40 in the phase (40 in all), 5xx 1, slower than 0.2s 0
+08:15:10 shadow: 11 s, canary searches 40 in the phase (40 in all), 5xx 1, slower than 0.2s 0
+08:15:12 shadow: 13 s, canary searches 40 in the phase (40 in all), 5xx 1, slower than 0.2s 0
+08:15:14 action [read-only] read the canary's searches, 5xx and le=0.2 bucket every 2 s (8 looks): shadow: no new canary search observed for 11 s while the stable build served 400 (the canary stopped answering; it had answered 40 in all)
+08:15:14 ROLLBACK: shadow, before any user reached the candidate - shadow: no new canary search observed for 11 s while the stable build served 400 (the canary stopped answering; it had answered 40 in all)
+08:15:14 weights now 100 0 0
+08:15:14 action [closed-loop] set weights 100/0/0 (roll back): shadow, before any user reached the candidate - shadow: no new canary search observed for 11 s while the stable build served 400 (the canary stopped answering; it had answered 40 in all)
+08:15:14 action [read-only] read svcdesk:release_build (ITSM-43, what changed): canary=2.1.0-rc.1, stable=2.0.0; builds seen in 10 min per track: canary: 2, stable: 1
+08:15:14 record: /tmp/itsmlab6-obxnrn20/run-1-rc.1/record/CHANGE.md
+08:15:14 outcome: rolled-back - shadow, before any user reached the candidate - shadow: no new canary search observed for 11 s while the stable build served 400 (the canary stopped answering; it had answered 40 in all) (22 s)

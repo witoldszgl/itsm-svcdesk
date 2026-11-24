@@ -1,0 +1,50 @@
+08:16:11 candidate itsmlab.local/lab6-candidate:9f12316a1b16, stable ghcr.io/swasik/svcdesk-v2-seeded:2.0.0, strategy canary
+08:16:11 config: SLO window 28d; availability 0.99 (max burn 10); latency 0.99 under 0.2s (max burn 10); min_requests 60; interval 2s; timeout 165s; steps 10 50 % for 20 15 s
+08:16:11 Prometheus http://prometheus:9090; Caddy admin http://edge:2019
+08:16:11 gate: 5xx share > 10 %, share slower than 0.2 s (le="0.2") > 10 %, each with >= 5 bad; stall after 10 s; shadow nginx (200 searches, 10-60 s)
+08:16:11 weights now 100 0 0
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Recreate 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Recreated 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Starting 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Started 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Waiting 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Healthy 
+08:16:12 svcdesk-canary runs itsmlab.local/lab6-candidate:9f12316a1b16
+08:16:12 action [approve-then-act] start svcdesk-canary with the candidate at weight 0
+08:16:17 action [read-only] read svcdesk_build_info from Prometheus: canary track runs 2.1.0-rc.2, stable 2.0.0
+08:16:17 weights now 0 0 100
+08:16:18 action [closed-loop] set weights 0/0/100: every user search through the nginx mirror to 2.0.0, a copy to the candidate
+08:16:20 shadow: 2 s, canary searches 0 in the phase (0 in all), 5xx 0, slower than 0.2s 0
+08:16:22 shadow: 4 s, canary searches 76 in the phase (76 in all), 5xx 0, slower than 0.2s 0
+08:16:24 shadow: 6 s, canary searches 156 in the phase (156 in all), 5xx 0, slower than 0.2s 0
+08:16:26 shadow: 8 s, canary searches 236 in the phase (236 in all), 5xx 1, slower than 0.2s 0
+08:16:28 shadow: 10 s, canary searches 316 in the phase (316 in all), 5xx 1, slower than 0.2s 0
+08:16:28 action [read-only] read the canary's searches, 5xx and le=0.2 bucket every 2 s (6 looks): shadow passed after 10 s: 316 canary searches, 1 5xx, 0 slower than 0.2 s
+08:16:28 weights now 90 10 0
+08:16:29 action [closed-loop] set weights 90/10/0 (step 1 of 2)
+08:16:31 step 1 at 10 %: 2 s, canary searches 44 in the phase (440 in all), 5xx 0, slower than 0.2s 0
+08:16:33 step 1 at 10 %: 4 s, canary searches 54 in the phase (450 in all), 5xx 0, slower than 0.2s 0
+08:16:35 step 1 at 10 %: 6 s, canary searches 61 in the phase (457 in all), 5xx 0, slower than 0.2s 0
+08:16:37 step 1 at 10 %: 8 s, canary searches 64 in the phase (460 in all), 5xx 0, slower than 0.2s 0
+08:16:39 step 1 at 10 %: 10 s, canary searches 74 in the phase (470 in all), 5xx 0, slower than 0.2s 0
+08:16:42 step 1 at 10 %: 12 s, canary searches 84 in the phase (480 in all), 5xx 0, slower than 0.2s 0
+08:16:44 step 1 at 10 %: 15 s, canary searches 94 in the phase (490 in all), 5xx 0, slower than 0.2s 0
+08:16:46 step 1 at 10 %: 17 s, canary searches 101 in the phase (497 in all), 5xx 0, slower than 0.2s 0
+08:16:48 step 1 at 10 %: 19 s, canary searches 104 in the phase (500 in all), 5xx 0, slower than 0.2s 0
+08:16:50 step 1 at 10 %: 21 s, canary searches 114 in the phase (510 in all), 5xx 0, slower than 0.2s 0
+08:16:50 action [read-only] read the canary's SLIs every 2 s (11 looks): step 1 at 10 % passed after 21 s: 114 canary searches, 0 5xx, 0 slower than 0.2 s
+08:16:50 weights now 50 50 0
+08:16:50 action [closed-loop] set weights 50/50/0 (step 2 of 2)
+08:16:53 step 2 at 50 %: 2 s, canary searches 10 in the phase (520 in all), 5xx 0, slower than 0.2s 0
+08:16:55 step 2 at 50 %: 5 s, canary searches 60 in the phase (570 in all), 5xx 0, slower than 0.2s 0
+08:16:57 step 2 at 50 %: 7 s, canary searches 110 in the phase (620 in all), 5xx 1, slower than 0.2s 0
+08:16:59 step 2 at 50 %: 9 s, canary searches 144 in the phase (654 in all), 5xx 1, slower than 0.2s 0
+08:17:01 step 2 at 50 %: 11 s, canary searches 174 in the phase (684 in all), 5xx 1, slower than 0.2s 0
+08:17:03 step 2 at 50 %: 13 s, canary searches 210 in the phase (720 in all), 5xx 1, slower than 0.2s 0
+08:17:06 step 2 at 50 %: 15 s, canary searches 260 in the phase (770 in all), 5xx 1, slower than 0.2s 0
+08:17:06 action [read-only] read the canary's SLIs every 2 s (8 looks): step 2 at 50 % passed after 15 s: 260 canary searches, 1 5xx, 0 slower than 0.2 s
+08:17:06 weights now 0 100 0
+08:17:06 action [closed-loop] set weights 0/100/0 (promote)
+08:17:06 action [read-only] read svcdesk:release_build (ITSM-43, what changed): canary=2.1.0-rc.2, stable=2.0.0; builds seen in 10 min per track: canary: 2, stable: 1
+08:17:06 record: /tmp/itsmlab6-obxnrn20/run-2-rc.2/record/CHANGE.md
+08:17:06 outcome: promoted - every phase passed: 770 canary searches in all, 2 5xx (0.2 %), 0 slower than 0.2 s, against thresholds of 10 % and 10 % (55 s)

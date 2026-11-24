@@ -1,0 +1,25 @@
+08:18:03 candidate itsmlab.local/lab6-candidate:4446e1a8d465, stable ghcr.io/swasik/svcdesk-v2-seeded:2.0.0, strategy canary
+08:18:03 config: SLO window 28d; availability 0.99 (max burn 10); latency 0.99 under 0.2s (max burn 10); min_requests 60; interval 2s; timeout 165s; steps 10 50 % for 20 15 s
+08:18:03 Prometheus http://prometheus:9090; Caddy admin http://edge:2019
+08:18:03 gate: 5xx share > 10 %, share slower than 0.2 s (le="0.2") > 10 %, each with >= 5 bad; stall after 10 s; shadow nginx (200 searches, 10-60 s)
+08:18:03 weights now 100 0 0
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Recreate 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Recreated 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Starting 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Started 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Waiting 
+ Container itsmlab6-0c9a453f-svcdesk-canary-1 Healthy 
+08:18:04 svcdesk-canary runs itsmlab.local/lab6-candidate:4446e1a8d465
+08:18:04 action [approve-then-act] start svcdesk-canary with the candidate at weight 0
+08:18:07 action [read-only] read svcdesk_build_info from Prometheus: canary track runs 2.1.0-rc.3, stable 2.0.0
+08:18:07 weights now 0 0 100
+08:18:07 action [closed-loop] set weights 0/0/100: every user search through the nginx mirror to 2.0.0, a copy to the candidate
+08:18:09 shadow: 2 s, canary searches 0 in the phase (0 in all), 5xx 0, slower than 0.2s 0
+08:18:12 shadow: 4 s, canary searches 37 in the phase (37 in all), 5xx 0, slower than 0.2s 2
+08:18:14 action [read-only] read the canary's searches, 5xx and le=0.2 bucket every 2 s (4 looks): latency: 42 of 118 canary searches slower than 0.2 s (35.5 %) against a 10 % threshold (shadow)
+08:18:14 ROLLBACK: shadow, before any user reached the candidate - latency: 42 of 118 canary searches slower than 0.2 s (35.5 %) against a 10 % threshold (shadow)
+08:18:14 weights now 100 0 0
+08:18:14 action [closed-loop] set weights 100/0/0 (roll back): shadow, before any user reached the candidate - latency: 42 of 118 canary searches slower than 0.2 s (35.5 %) against a 10 % threshold (shadow)
+08:18:14 action [read-only] read svcdesk:release_build (ITSM-43, what changed): canary=2.1.0-rc.3, stable=2.0.0; builds seen in 10 min per track: canary: 2, stable: 1
+08:18:14 record: /tmp/itsmlab6-obxnrn20/run-3-rc.3/record/CHANGE.md
+08:18:14 outcome: rolled-back - shadow, before any user reached the candidate - latency: 42 of 118 canary searches slower than 0.2 s (35.5 %) against a 10 % threshold (shadow) (12 s)
